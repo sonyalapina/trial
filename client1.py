@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import os
+import time
 import sys
 import errno
 
@@ -21,9 +22,9 @@ def client():
     
     while True:
         # Запрашиваем ввод от пользователя
-        user_input = input("Введите сообщение: ").strip()
+        user_input = input("Введите сообщение: ")
         
-        if user_input.lower() == "exit":
+        if user_input.lower().strip() == "exit":
             print("Завершение работы клиента...")
             break
         
