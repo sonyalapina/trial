@@ -121,9 +121,7 @@ class Client:
         print(" ")
         print("КЛИЕНТ ЗАПУЩЕН")
         print(" ")
-        print("Введите сообщение для отправки серверу")
-        print("Только 'ping' получит ответ 'pong'")
-        print("Любое другое сообщение получит ошибку")
+        
 
         while True:
             try:
@@ -143,7 +141,6 @@ class Client:
                     print(f"[Клиент] Ошибка: {error}")
                     continue
 
-                print("[Клиент] Ожидание ответа от сервера...")
 
                 success, response, error = self.wait_for_response()
                 if not success:
@@ -151,7 +148,7 @@ class Client:
                     continue
 
                 if response == "pong":
-                    print(f"[Клиент] Успех! Получен правильный ответ: {response}")
+                    print(f"[Клиент] Получен ответ: {response}")
                 elif response.startswith("Ошибка"):
                     print(f"[Клиент] Сервер вернул ошибку: {response}")
                 else:
