@@ -4,8 +4,7 @@ import sys
 import errno
 
 def client():
-    """Простой клиент для ping-pong"""
-    print("=== Клиент PING-PONG ===")
+    
     
     # Имена FIFO файлов
     ping_fifo = "/tmp/ping_fifo"
@@ -13,11 +12,11 @@ def client():
     
     # Проверяем, запущен ли сервер
     if not os.path.exists(ping_fifo) or not os.path.exists(pong_fifo):
-        print("Ошибка: Сервер не запущен!")
-        print("Запустите сначала сервер: python3 server.py")
+        
+        print("Запустите сначала сервер")
         return 1
     
-    print("\nВведите 'ping' для отправки запроса")
+    print("\nВведите запрос")
     print("Или 'exit' для выхода\n")
     
     while True:
@@ -28,21 +27,16 @@ def client():
             print("Завершение работы клиента...")
             break
         
-        if user_input != "ping":
-            print("Ошибка: можно отправить только 'ping'")
-            print("Попробуйте снова\n")
-            continue
-        
         try:
             # 1. Открываем FIFO для отправки запроса серверу
             print("\nОтправка запроса серверу...")
             ping_fd = os.open(ping_fifo, os.O_WRONLY)
-            print(f"Открыт файловый дескриптор для записи: {ping_fd}")
+            
             
             # 2. Отправляем "ping"
-            message = "ping"
-            os.write(ping_fd, message.encode('utf-8'))
-            print(f"Отправлено сообщение: '{message}'")
+            
+            os.write(ping_fd, user_input.encode('utf-8'))
+            print(f"Отправлено сообщение: '{user_input}'")
             
             # 3. Закрываем дескриптор записи
             os.close(ping_fd)
@@ -50,7 +44,7 @@ def client():
             # 4. Открываем FIFO для получения ответа от сервера
             print("Ожидание ответа от сервера...")
             pong_fd = os.open(pong_fifo, os.O_RDONLY)
-            print(f"Открыт файловый дескриптор для чтения: {pong_fd}")
+            
             
             # 5. Читаем ответ от сервера
             data = os.read(pong_fd, 1024)
@@ -60,10 +54,7 @@ def client():
             # 6. Закрываем дескриптор чтения
             os.close(pong_fd)
             
-            if response == "pong":
-                print("✓ Успешный обмен сообщениями!")
-            else:
-                print(f"✗ Неожиданный ответ: '{response}'")
+            
             
             print("\n" + "="*40 + "\n")
             
