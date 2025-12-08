@@ -49,7 +49,7 @@ def client():
             
             # 5. Читаем ответ от сервера
             data = os.read(pong_fd, 1024)
-            response = data.decode('utf-8').strip()
+            response = data.decode('utf-8')
             print(f"Получен ответ от сервера: '{response}'")
             
             # 6. Закрываем дескриптор чтения
