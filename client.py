@@ -10,7 +10,7 @@ POLL_INTERVAL = 0.1
 READ_TIMEOUT = 5
 
 # Путь к общему файлу
-SHARED_FILE_PATH = os.path.join(os.path.dirname(file), 'shared_file.txt')
+SHARED_FILE_PATH = os.path.join(os.path.dirname(__file__), 'shared_file.txt')
 
 
 class Client:
