@@ -26,7 +26,7 @@ def server():
             if e.errno != errno.EEXIST:
                 raise
         
-        print("\nСервер ожидает сообщение 'ping'...")
+        print("\nСервер ожидает сообщение...")
         print("Для завершения нажмите Ctrl+C\n")
         
         while True:
@@ -68,9 +68,7 @@ def server():
             except KeyboardInterrupt:
                 print("\nСервер завершает работу...")
                 break
-            except OSError as e:
-                print(f"Ошибка ввода-вывода: {e}")
-                break
+            
                 
     except Exception as e:
         print(f"Неожиданная ошибка: {e}")
