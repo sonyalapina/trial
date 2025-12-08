@@ -4,8 +4,7 @@ import sys
 import errno
 
 def server():
-    """Простой сервер для ping-pong"""
-    print("=== Сервер PING-PONG ===")
+    
     
     # Создаем именованные каналы (FIFO)
     ping_fifo = "/tmp/ping_fifo"
@@ -35,7 +34,7 @@ def server():
                 # 1. Открываем FIFO для чтения от клиента (блокирующий режим)
                 print("Ожидание запроса от клиента...")
                 ping_fd = os.open(ping_fifo, os.O_RDONLY)
-                print(f"Открыт файловый дескриптор для чтения: {ping_fd}")
+                
                 
                 # 2. Читаем сообщение от клиента
                 data = os.read(ping_fd, 1024)
@@ -46,12 +45,12 @@ def server():
                 os.close(ping_fd)
                 
                 # 4. Проверяем сообщение
-                if message == "ping":
-                    print("✓ Корректный запрос 'ping'")
+                if message.lower() == "ping":
+                    
                     
                     # 5. Открываем FIFO для записи ответа клиенту
                     pong_fd = os.open(pong_fifo, os.O_WRONLY)
-                    print(f"Открыт файловый дескриптор для записи: {pong_fd}")
+                    
                     
                     # 6. Отправляем ответ "pong"
                     response = "pong"
@@ -63,7 +62,7 @@ def server():
                     
                     print("=" * 40 + "\n")
                 else:
-                    print(f"✗ Ошибка: ожидалось 'ping', получено '{message}'")
+                    print(f"Ошибка: неверный запрос")
                     print("=" * 40 + "\n")
                     
             except KeyboardInterrupt:
