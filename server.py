@@ -62,7 +62,6 @@ class Server:
                 if content:
                     # Если мы только что записали ответ - игнорируем его
                     if self.just_wrote:
-                        print(f"[Сервер] Игнорирую только что записанный ответ: '{content}'")
                         # Очищаем файл и сбрасываем флаг
                         os.ftruncate(fd, 0)
                         os.lseek(fd, 0, os.SEEK_SET)
@@ -129,7 +128,7 @@ class Server:
         message = message.strip().lower()
         if message == "ping":
             return "pong"
-        return "Ошибка: отправьте 'ping'"
+        return "Ошибка: неверный запрос"
 
     def run(self):
         print(" ")
@@ -146,10 +145,10 @@ class Server:
                     if message is None:
                         time.sleep(POLL_INTERVAL)
 
-                print(f"[Сервер] Обрабатываю сообщение: '{message}'")
+               
 
                 response = self.process_message(message)
-                print(f"[Сервер] Готовлю ответ: '{response}'")
+            
 
                 if self.write_response(response):
                     print("[Сервер] Ответ успешно отправлен")
