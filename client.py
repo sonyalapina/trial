@@ -13,44 +13,76 @@ def client(server_id):
         print("Запустите сервер с командой: python server.py [server_id]")
         return 1
     
-    # Файл для хранения счетчика клиентов
-    counter_file = f"/tmp/client_counter_{server_id}.txt"
+    # Файл для хранения информации о клиентах
+    clients_file = f"/tmp/clients_info_{server_id}.txt"
+    client_number = None
     
     # Получаем номер клиента
-    client_number = 1
     try:
-        fd = os.open(counter_file, os.O_RDWR | os.O_CREAT)
+        fd = os.open(clients_file, os.O_RDWR | os.O_CREAT)
         os.lockf(fd, os.F_LOCK, 0)
         
+        # Читаем текущее количество клиентов
         try:
-            data = os.read(fd, 16)
+            data = os.read(fd, 1024)
             if data:
-                client_number = int(data.decode('utf-8').strip()) + 1
+                current_clients = int(data.decode('utf-8').strip())
+            else:
+                current_clients = 0
         except:
-            pass
-            
+            current_clients = 0
+        
+        # Увеличиваем счетчик и получаем номер клиента
+        client_number = current_clients + 1
+        
+        # Записываем обновленное количество
         os.lseek(fd, 0, os.SEEK_SET)
         os.write(fd, str(client_number).encode('utf-8'))
         os.ftruncate(fd, len(str(client_number)))
+        os.fsync(fd)
         
         os.lockf(fd, os.F_ULOCK, 0)
         os.close(fd)
-    except:
-        pass  # Если не удалось получить номер, используем 1
-    
-    print(f"\nКлиент #{client_number} подключен к серверу {server_id}")
-    print("Введите запрос (ping) или 'exit' для выхода\n")
+        
+        print(f"\nПодключение к серверу {server_id}")
+        print(f"Вы - клиент №{client_number}")
+        print("Введите запрос или 'exit' для выхода\n")
+        
+    except Exception as e:
+        print(f"Ошибка при получении номера клиента: {e}")
+        return 1
     
     try:    
         while True:
-            user_input = input(f"Клиент #{client_number}> ").strip()
+            user_input = input(f"Клиент №{client_number}> ").strip()
             
             if user_input.lower() == "exit":
-                print("Завершение работы...")
+                print(f"Клиент №{client_number} завершает работу...")
+                
+                # Уменьшаем счетчик клиентов при выходе
+                try:
+                    fd = os.open(clients_file, os.O_RDWR)
+                    os.lockf(fd, os.F_LOCK, 0)
+                    
+                    data = os.read(fd, 1024)
+                    if data:
+                        current_clients = int(data.decode('utf-8').strip())
+                        # Не уменьшаем ниже 0
+                        if current_clients > 0:
+                            new_count = current_clients - 1
+                            os.lseek(fd, 0, os.SEEK_SET)
+                            os.write(fd, str(new_count).encode('utf-8'))
+                            os.ftruncate(fd, len(str(new_count)))
+                    
+                    os.lockf(fd, os.F_ULOCK, 0)
+                    os.close(fd)
+                except:
+                    pass
+                    
                 break
 
             if not user_input:                
-                print("Ошибка: запрос не может быть пустым")
+                print(f"Клиент №{client_number}: Ошибка: запрос не может быть пустым\n")
                 continue
             
             try:            
@@ -59,9 +91,9 @@ def client(server_id):
                 os.lockf(fd, os.F_LOCK, 0)
                 
                 # Записываем запрос в файл с номером клиента
-                formatted_request = f"#{client_number}:{user_input}"
+                request_data = f"{client_number}:{user_input}"
                 os.lseek(fd, 0, os.SEEK_SET)
-                os.write(fd, formatted_request.encode('utf-8'))
+                os.write(fd, request_data.encode('utf-8'))
                 
                 # Сбрасываем на диск
                 os.fsync(fd)
@@ -89,17 +121,16 @@ def client(server_id):
                         if data:
                             response = data.decode('utf-8')
                             
-                            # Проверяем, содержит ли ответ наш номер клиента
-                            expected_prefix = f"#{client_number}:"
-                            if response.startswith(expected_prefix):
-                                response_content = response[len(expected_prefix):]
-                                if response_content.strip() == " ":
-                                    print("Ошибка: неверный запрос")
-                                else:
-                                    print(f"Ответ: {response_content.strip()}")
+                            if response == " ":
+                                print(f"Клиент №{client_number}: Ошибка: неверный запрос")
                                 response_received = True
+                            else:
+                                # Проверяем, что ответ отличается от нашего запроса
+                                if not response.startswith(f"{client_number}:"):
+                                    print(f"Клиент №{client_number}: {response}")
+                                    response_received = True
                             
-                            # Очищаем файл если ответ наш
+                            # Очищаем файл
                             if response_received:
                                 os.ftruncate(fd, 0)
 
@@ -119,20 +150,39 @@ def client(server_id):
                         time.sleep(0.1)
                 
                 if not response_received:
-                    print("Таймаут: сервер не ответил")
+                    print(f"Клиент №{client_number}: Таймаут: сервер не ответил")
                 
-                print("")
+                print()
            
             except OSError as e:
                 if e.errno == errno.EACCES:
-                    print("Ошибка доступа к файлу")
+                    print(f"Клиент №{client_number}: Ошибка доступа к файлу")
                 break
             except Exception as e:
-                print(f"Неожиданная ошибка: {e}")
+                print(f"Клиент №{client_number}: Неожиданная ошибка: {e}")
                 break
     
     except KeyboardInterrupt:
-        print(f"\nКлиент #{client_number} завершает работу...")
+        print(f"\nКлиент №{client_number} завершает работу...")
+        
+        # Уменьшаем счетчик клиентов при прерывании
+        try:
+            fd = os.open(clients_file, os.O_RDWR)
+            os.lockf(fd, os.F_LOCK, 0)
+            
+            data = os.read(fd, 1024)
+            if data:
+                current_clients = int(data.decode('utf-8').strip())
+                if current_clients > 0:
+                    new_count = current_clients - 1
+                    os.lseek(fd, 0, os.SEEK_SET)
+                    os.write(fd, str(new_count).encode('utf-8'))
+                    os.ftruncate(fd, len(str(new_count)))
+            
+            os.lockf(fd, os.F_ULOCK, 0)
+            os.close(fd)
+        except:
+            pass
     
     return 0
 
