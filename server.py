@@ -1,177 +1,147 @@
+#!/usr/bin/env python3
 import os
 import time
-import fcntl
-ENCODING = 'utf-8'
+import sys
+import errno
 
-# Интервал опроса файла (секунды)
-POLL_INTERVAL = 0.1
-
-# Таймаут ожидания (секунды)
-READ_TIMEOUT = 5
-
-# Путь к общему файлу
-SHARED_FILE_PATH = os.path.join(os.path.dirname(__file__), 'shared_file.txt')
-
-
-class Server:
-    def __init__(self):
-        self.shared_file_path = SHARED_FILE_PATH
-        self.just_wrote = False  # Флаг, что мы только что записали ответ
-        self.create_shared_file()
-
-    def create_shared_file(self):
+def client(server_id):
+    # Используем тот же файл, что и сервер
+    shared_file = f"/tmp/shared_communication_{server_id}.txt"
+    
+    if not os.path.exists(shared_file):
+        print(f"Сервер с ID '{server_id}' не запущен или файл не найден")
+        print("Запустите сервер с командой: python server.py [server_id]")
+        return 1
+    
+    # Файл для хранения счетчика клиентов
+    counter_file = f"/tmp/client_counter_{server_id}.txt"
+    
+    # Получаем номер клиента
+    client_number = 1
+    try:
+        fd = os.open(counter_file, os.O_RDWR | os.O_CREAT)
+        os.lockf(fd, os.F_LOCK, 0)
+        
         try:
-            with open(self.shared_file_path, 'w') as f:
-                pass
-            os.chmod(self.shared_file_path, 0o666)
-            print(f"Создан общий файл: {self.shared_file_path}")
-        except Exception as e:
-            print(f"Ошибка при создании файла: {e}")
-            raise
-
-    def lock_file(self, fd):
-        try:
-            fcntl.flock(fd, fcntl.LOCK_EX)
-            return True
-        except:
-            return False
-
-    def unlock_file(self, fd):
-        try:
-            fcntl.flock(fd, fcntl.LOCK_UN)
+            data = os.read(fd, 16)
+            if data:
+                client_number = int(data.decode('utf-8').strip()) + 1
         except:
             pass
-
-    def read_client_message(self):
-        """Читаем сообщение, но игнорируем если это наш только что записанный ответ"""
-        try:
-            fd = os.open(self.shared_file_path, os.O_RDWR)
-
-            if not self.lock_file(fd):
-                os.close(fd)
-                return None
-
-            try:
-                file_size = os.fstat(fd).st_size
-                if file_size == 0:
-                    return None
-
-                os.lseek(fd, 0, os.SEEK_SET)
-                content = os.read(fd, file_size).decode(ENCODING).strip()
-
-                if content:
-                    # Если мы только что записали ответ - игнорируем его
-                    if self.just_wrote:
-                        # Очищаем файл и сбрасываем флаг
-                        os.ftruncate(fd, 0)
-                        os.lseek(fd, 0, os.SEEK_SET)
-                        os.fsync(fd)
-                        self.just_wrote = False
-                        return None
-                    
-                    # Это настоящее сообщение от клиента
-                    print(f"[Сервер] Найдено сообщение от клиента: '{content}'")
-                    os.ftruncate(fd, 0)
-                    os.lseek(fd, 0, os.SEEK_SET)
-                    os.fsync(fd)
-                    return content
-
-            finally:
-                self.unlock_file(fd)
-                os.close(fd)
-
-            return None
-
-        except Exception as e:
-            print(f"Ошибка при чтении файла: {e}")
-            return None
-
-    def write_response(self, response):
-        try:
-            fd = os.open(self.shared_file_path, os.O_RDWR | os.O_CREAT)
-
-            if not self.lock_file(fd):
-                os.close(fd)
-                return False
-
-            try:
-                # Ждем, чтобы клиент успел отпустить блокировку
-                time.sleep(0.05)
-
-                # Устанавливаем флаг, что мы собираемся записать ответ
-                self.just_wrote = True
-                
-                # Записываем ответ
-                os.ftruncate(fd, 0)
-                os.lseek(fd, 0, os.SEEK_SET)
-                os.fsync(fd)
-
-                os.write(fd, response.encode(ENCODING))
-                os.fsync(fd)
-                
-                print(f"[Сервер] Записан ответ в файл: '{response}'")
-
-                return True
-
-            finally:
-                self.unlock_file(fd)
-                os.close(fd)
-
-        except Exception as e:
-            print(f"Ошибка при записи в файл: {e}")
-            self.just_wrote = False
-            return False
-
-    def process_message(self, message):
-        if not message:
-            return "Ошибка: пустое сообщение"
-        message = message.strip().lower()
-        if message == "ping":
-            return "pong"
-        return "Ошибка: неверный запрос"
-
-    def run(self):
-        print(" ")
-        print("СЕРВЕР ЗАПУЩЕН")
-        print(" ")
-        print("Сервер ждет сообщения от клиента...\n")
-
-        try:
-            while True:
-                message = None
-
-                while message is None:
-                    message = self.read_client_message()
-                    if message is None:
-                        time.sleep(POLL_INTERVAL)
-
-               
-
-                response = self.process_message(message)
             
+        os.lseek(fd, 0, os.SEEK_SET)
+        os.write(fd, str(client_number).encode('utf-8'))
+        os.ftruncate(fd, len(str(client_number)))
+        
+        os.lockf(fd, os.F_ULOCK, 0)
+        os.close(fd)
+    except:
+        pass  # Если не удалось получить номер, используем 1
+    
+    print(f"\nКлиент #{client_number} подключается к серверу {server_id}")
+    print("Введите запрос или 'exit' для выхода")
+    print("Доступные команды: ping, имя, test\n")
+    
+    try:    
+        while True:
+            user_input = input(f"Клиент #{client_number}> ").strip()
+            
+            if user_input.lower() == "exit":
+                print("Завершение работы клиента...")
+                break
 
-                if self.write_response(response):
-                    print("[Сервер] Ответ успешно отправлен")
-                else:
-                    print("[Сервер] Ошибка отправки ответа")
+            if not user_input:                
+                print(f"Клиент #{client_number}> Ошибка: запрос не может быть пустым")
+                continue
+            
+            try:            
+                # Открываем файл для записи с блокировкой
+                fd = os.open(shared_file, os.O_RDWR)            
+                os.lockf(fd, os.F_LOCK, 0)
+                
+                # Записываем запрос в файл с номером клиента
+                formatted_request = f"#{client_number}:{user_input}"
+                os.lseek(fd, 0, os.SEEK_SET)
+                os.write(fd, formatted_request.encode('utf-8'))
+                
+                # Сбрасываем на диск
+                os.fsync(fd)
+                
+                # Снимаем блокировку
+                os.lockf(fd, os.F_ULOCK, 0)
+                os.close(fd)
+                
+                response_received = False
+                timeout = 5
+                start_time = time.time()
+                
+                while not response_received and (time.time() - start_time) < timeout:
+                    try:
+                        # Открываем для чтения
+                        fd = os.open(shared_file, os.O_RDWR)
+                        
+                        # Блокируем для чтения
+                        os.lockf(fd, os.F_LOCK, 0)
+                        
+                        # Читаем ответ
+                        os.lseek(fd, 0, os.SEEK_SET)
+                        data = os.read(fd, 1024)
+                        
+                        if data:
+                            response = data.decode('utf-8')
+                            
+                            # Проверяем, содержит ли ответ наш номер клиента
+                            expected_prefix = f"#{client_number}:"
+                            if response.startswith(expected_prefix):
+                                response_content = response[len(expected_prefix):]
+                                if response_content.strip() == " ":
+                                    print(f"Клиент #{client_number}> Ошибка: неверный запрос")
+                                else:
+                                    print(f"Клиент #{client_number}> Ответ от сервера: {response_content.strip()}")
+                                response_received = True
+                            
+                            # Очищаем файл если ответ наш
+                            if response_received:
+                                os.ftruncate(fd, 0)
+
+                        os.lockf(fd, os.F_ULOCK, 0)
+                        os.close(fd)                        
+                   
+                    except Exception as e:
+                        try:
+                            if 'fd' in locals():
+                                os.lockf(fd, os.F_ULOCK, 0)
+                                os.close(fd)
+                        except:
+                            pass
+                        continue
                     
-                # Даем время клиенту прочитать ответ
-                time.sleep(0.1)
-
-        except KeyboardInterrupt:
-            print("\n[Сервер] Остановка")
-        finally:
-            self.cleanup()
-
-    def cleanup(self):
-        try:
-            if os.path.exists(self.shared_file_path):
-                os.remove(self.shared_file_path)
-                print(f"[Сервер] Файл удален: {self.shared_file_path}")
-        except:
-            pass
-
+                    if not response_received:
+                        time.sleep(0.1)
+                
+                if not response_received:
+                    print(f"Клиент #{client_number}> Таймаут: сервер не ответил")
+                
+                print("")
+           
+            except OSError as e:
+                if e.errno == errno.EACCES:
+                    print(f"Клиент #{client_number}> Ошибка доступа к файлу")
+                break
+            except Exception as e:
+                print(f"Клиент #{client_number}> Неожиданная ошибка: {e}")
+                break
+    
+    except KeyboardInterrupt:
+        print(f"\nКлиент #{client_number} завершает работу...")
+    
+    return 0
 
 if __name__ == "__main__":
-    server = Server()
-    server.run()
+    if len(sys.argv) < 2:
+        print("Использование: python client.py <server_id>")
+        print("Пример: python client.py server1")
+        sys.exit(1)
+    
+    server_id = sys.argv[1]
+    sys.exit(client(server_id))
