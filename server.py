@@ -54,58 +54,40 @@ def server(server_id=None):
                                 client_number = int(client_num_str)
                                 client_message = message[colon_pos + 1:].strip()
                                 
-                                print(f"Сервер {server_id}: Клиент #{client_number}: {client_message}")
+                                # Выводим что получили
+                                print(f"Запрос от клиента #{client_number}: '{client_message}'")
                                 
-                                # Очищаем файл
-                                time.sleep(1)
-                                os.ftruncate(fd, 0)
-
+                                # Обрабатываем команду
                                 if client_message.lower() == "ping":
                                     response = f"pong от сервера {server_id}"
                                     # Записываем ответ в файл с номером клиента
                                     formatted_response = f"#{client_number}:{response}"
                                     os.lseek(fd, 0, os.SEEK_SET)
                                     os.write(fd, formatted_response.encode('utf-8'))
-                                    print(f"Сервер {server_id}> Отправлено клиенту #{client_number}: {response}")
-                                    
-                                    # Сбрасываем буферы на диск
-                                    os.fsync(fd) 
-                                    
-                                elif client_message.lower() == "имя":
-                                    response = f"Сервер {server_id} приветствует клиента #{client_number}"
-                                    formatted_response = f"#{client_number}:{response}"
-                                    os.lseek(fd, 0, os.SEEK_SET)
-                                    os.write(fd, formatted_response.encode('utf-8'))
-                                    print(f"Сервер {server_id}> Отправлено клиенту #{client_number}: приветствие")
+                                    print(f"Отправил ответ клиенту #{client_number}: pong")
                                     os.fsync(fd)
-                                    
-                                elif client_message.lower() == "test":
-                                    response = f"Тест выполнен для клиента #{client_number}"
-                                    formatted_response = f"#{client_number}:{response}"
-                                    os.lseek(fd, 0, os.SEEK_SET)
-                                    os.write(fd, formatted_response.encode('utf-8'))
-                                    print(f"Сервер {server_id}> Отправлено клиенту #{client_number}: тестовый ответ")
-                                    os.fsync(fd)
-                                    
+                                    time.sleep(0.5)
+                                    os.ftruncate(fd, 0)
                                 else:
-                                    # Выводим ошибку в терминал с указанием клиента
-                                    error_msg = f"Сервер {server_id}> ОШИБКА от клиента #{client_number}: '{client_message}'"
-                                    print(error_msg)
+                                    # Ошибка
+                                    print(f"ОШИБКА от клиента #{client_number}: неверный запрос '{client_message}'")
                                     os.lseek(fd, 0, os.SEEK_SET)
                                     formatted_error = f"#{client_number}: "
                                     os.write(fd, formatted_error.encode('utf-8'))
                                     os.fsync(fd)
+                                    time.sleep(0.5)
+                                    os.ftruncate(fd, 0)
+                                    
+                                print("")
                                     
                             except ValueError:
                                 # Если не удалось распарсить номер клиента
-                                print(f"Сервер {server_id}: Некорректный формат сообщения: {message}")
+                                print(f"Некорректный формат сообщения: {message}")
                                 os.ftruncate(fd, 0)
                         else:
                             # Если сообщение не в правильном формате
-                            print(f"Сервер {server_id}: Некорректное сообщение: {message}")
+                            print(f"Некорректное сообщение: {message}")
                             os.ftruncate(fd, 0)
-                        
-                        print("")
                     
                     os.lockf(fd, os.F_ULOCK, 0)
                     
