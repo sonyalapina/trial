@@ -38,20 +38,19 @@ def client(server_id):
     except:
         pass  # Если не удалось получить номер, используем 1
     
-    print(f"\nКлиент #{client_number} подключается к серверу {server_id}")
-    print("Введите запрос или 'exit' для выхода")
-    print("Доступные команды: ping, имя, test\n")
+    print(f"\nКлиент #{client_number} подключен к серверу {server_id}")
+    print("Введите запрос (ping) или 'exit' для выхода\n")
     
     try:    
         while True:
             user_input = input(f"Клиент #{client_number}> ").strip()
             
             if user_input.lower() == "exit":
-                print("Завершение работы клиента...")
+                print("Завершение работы...")
                 break
 
             if not user_input:                
-                print(f"Клиент #{client_number}> Ошибка: запрос не может быть пустым")
+                print("Ошибка: запрос не может быть пустым")
                 continue
             
             try:            
@@ -95,9 +94,9 @@ def client(server_id):
                             if response.startswith(expected_prefix):
                                 response_content = response[len(expected_prefix):]
                                 if response_content.strip() == " ":
-                                    print(f"Клиент #{client_number}> Ошибка: неверный запрос")
+                                    print("Ошибка: неверный запрос")
                                 else:
-                                    print(f"Клиент #{client_number}> Ответ от сервера: {response_content.strip()}")
+                                    print(f"Ответ: {response_content.strip()}")
                                 response_received = True
                             
                             # Очищаем файл если ответ наш
@@ -120,16 +119,16 @@ def client(server_id):
                         time.sleep(0.1)
                 
                 if not response_received:
-                    print(f"Клиент #{client_number}> Таймаут: сервер не ответил")
+                    print("Таймаут: сервер не ответил")
                 
                 print("")
            
             except OSError as e:
                 if e.errno == errno.EACCES:
-                    print(f"Клиент #{client_number}> Ошибка доступа к файлу")
+                    print("Ошибка доступа к файлу")
                 break
             except Exception as e:
-                print(f"Клиент #{client_number}> Неожиданная ошибка: {e}")
+                print(f"Неожиданная ошибка: {e}")
                 break
     
     except KeyboardInterrupt:
