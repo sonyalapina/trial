@@ -14,6 +14,16 @@ def server(server_id=None):
     # Имя общего файла для общения с уникальным ID сервера
     shared_file = f"/tmp/shared_communication_{server_id}.txt"
     
+    # Файл для хранения информации о клиентах
+    clients_file = f"/tmp/clients_info_{server_id}.txt"
+    
+    # Инициализируем счетчик клиентов
+    try:
+        with open(clients_file, 'w') as f:
+            f.write("0")
+    except:
+        pass
+    
     print(f"Сервер {server_id} запущен")
     print(f"Файл общения: {shared_file}")
     print("Для подключения клиента используйте команду:")
@@ -26,7 +36,7 @@ def server(server_id=None):
             pass
         print(f"Файл {shared_file} готов")
 
-        print("Ожидание запроса от клиентов...\n")
+        print("Ожидание запроса от клиента...\n")
         
         while True:
             try:
@@ -43,51 +53,44 @@ def server(server_id=None):
                     data = os.read(fd, 1024)
                     
                     if data:
-                        message = data.decode('utf-8').strip()
+                        message_data = data.decode('utf-8').strip()
                         
-                        # Проверяем формат сообщения (#номер:сообщение)
-                        if ':' in message and message.startswith('#'):
-                            try:
-                                # Извлекаем номер клиента
-                                colon_pos = message.find(':')
-                                client_num_str = message[1:colon_pos]
-                                client_number = int(client_num_str)
-                                client_message = message[colon_pos + 1:].strip()
-                                
-                                # Выводим что получили
-                                print(f"Запрос от клиента #{client_number}: '{client_message}'")
-                                
-                                # Обрабатываем команду
-                                if client_message.lower() == "ping":
-                                    response = f"pong от сервера {server_id}"
-                                    # Записываем ответ в файл с номером клиента
-                                    formatted_response = f"#{client_number}:{response}"
-                                    os.lseek(fd, 0, os.SEEK_SET)
-                                    os.write(fd, formatted_response.encode('utf-8'))
-                                    print(f"Отправил ответ клиенту #{client_number}: pong")
-                                    os.fsync(fd)
-                                    time.sleep(0.5)
-                                    os.ftruncate(fd, 0)
-                                else:
-                                    # Ошибка
-                                    print(f"ОШИБКА от клиента #{client_number}: неверный запрос '{client_message}'")
-                                    os.lseek(fd, 0, os.SEEK_SET)
-                                    formatted_error = f"#{client_number}: "
-                                    os.write(fd, formatted_error.encode('utf-8'))
-                                    os.fsync(fd)
-                                    time.sleep(0.5)
-                                    os.ftruncate(fd, 0)
-                                    
-                                print("")
-                                    
-                            except ValueError:
-                                # Если не удалось распарсить номер клиента
-                                print(f"Некорректный формат сообщения: {message}")
-                                os.ftruncate(fd, 0)
-                        else:
-                            # Если сообщение не в правильном формате
-                            print(f"Некорректное сообщение: {message}")
+                        # Разбираем сообщение: номер_клиента:сообщение
+                        if ':' in message_data:
+                            client_num, message = message_data.split(':', 1)
+                            client_num = client_num.strip()
+                            message = message.strip()
+                            
+                            print(f"Сервер {server_id}: Получено сообщение от клиента №{client_num}: {message}")
+                            
+                            # Очищаем файл
+                            time.sleep(1)
                             os.ftruncate(fd, 0)
+
+                            if message.lower() == "ping":
+                                response = f"Клиент №{client_num}: pong от сервера {server_id}"
+                                # Записываем ответ в файл
+                                os.lseek(fd, 0, os.SEEK_SET)
+                                os.write(fd, response.encode('utf-8'))
+                                print(f"Сервер {server_id}: Отправлен ответ клиенту №{client_num}")
+                                
+                                # Сбрасываем буферы на диск
+                                os.fsync(fd)                            
+                            else:
+                                # Выводим ошибку в терминал
+                                error_msg = f"Сервер {server_id}: Клиент №{client_num}: Ошибка: неверный запрос"
+                                print(error_msg)
+                                os.lseek(fd, 0, os.SEEK_SET)
+                                os.write(fd, b" ")
+                                os.fsync(fd)
+                        else:
+                            # Если формат неверный
+                            print(f"Сервер {server_id}: Получено некорректное сообщение: {message_data}")
+                            os.lseek(fd, 0, os.SEEK_SET)
+                            os.write(fd, b" ")
+                            os.fsync(fd)
+                        
+                        print("\n")
                     
                     os.lockf(fd, os.F_ULOCK, 0)
                     
@@ -119,11 +122,9 @@ def server(server_id=None):
             os.unlink(shared_file)
             print(f"Файл {shared_file} удален")
         
-        # Удаляем файл счетчика клиентов
-        counter_file = f"/tmp/client_counter_{server_id}.txt"
-        if os.path.exists(counter_file):
-            os.unlink(counter_file)
-            print(f"Файл счетчика {counter_file} удален")
+        if os.path.exists(clients_file):
+            os.unlink(clients_file)
+            print(f"Файл {clients_file} удален")
     
     return 0
 
