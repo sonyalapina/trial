@@ -112,18 +112,18 @@ def client(server_id):
         while not shutdown_event.is_set():
             try:
             # Выводим приглашение
-            sys.stdout.write("Введите запрос: ")
-            sys.stdout.flush()
+                sys.stdout.write("Введите запрос: ")
+                sys.stdout.flush()
             
             # Ждем ввод
-            ready, _, _ = select.select([sys.stdin], [], [], 0.1)
-            if not ready:
-                # Если ввода нет, очищаем и начинаем заново
-                sys.stdout.write('\r' + ' ' * 20 + '\r')
-                sys.stdout.flush()
-                continue
+                ready, _, _ = select.select([sys.stdin], [], [], 0.1)
+                if not ready:
+                    # Если ввода нет, очищаем и начинаем заново
+                    sys.stdout.write('\r' + ' ' * 20 + '\r')
+                    sys.stdout.flush()
+                    continue
             
-            user_input = sys.stdin.readline().strip()
+                user_input = sys.stdin.readline().strip()
                 
             except EOFError:
                 # Если ввод завершен (может произойти при закрытии терминала)
