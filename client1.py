@@ -206,15 +206,21 @@ def client(server_id):
                                 print(f"\nСервер отключен")
                                 return 0
                             elif response == " ":
-                                print(f"Ошибка: неверный запрос")
+                                # Это специальный ответ от сервера на неверный запрос
+                                print(f"Ошибка: неверный запрос (сервер не распознал команду)")
                                 response_received = True
                             else:
                                 # Проверяем, что ответ отличается от нашего запроса
-                                if not response.startswith(f"{client_number}:"):
+                                # и содержит ответ от сервера
+                                if "pong" in response.lower() or "сервер" in response.lower():
+                                    print(f"{response}")
+                                    response_received = True
+                                elif not response.startswith(f"{client_number}:"):
+                                    # Любой другой ответ, который не начинается с нашего номера
                                     print(f"{response}")
                                     response_received = True
                             
-                            # Очищаем файл
+                            # Очищаем файл только если получили ответ
                             if response_received:
                                 os.ftruncate(fd, 0)
 
