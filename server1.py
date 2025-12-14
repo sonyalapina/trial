@@ -65,8 +65,7 @@ def server(server_id=None):
                 print(f"Файл {shared_file} удален")
             
             if os.path.exists(clients_file):
-                os.unlink(clients_file)
-                print(f"Файл {clients_file} удален")
+                os.unlink(clients_file)                
             
             sys.exit(0)
     
@@ -91,8 +90,7 @@ def server(server_id=None):
     try:
         # Создаем файл
         with open(shared_file, 'w') as f:
-            pass
-        print(f"Файл {shared_file} готов")
+            pass        
 
         print("Ожидание запроса от клиента...\n")
         
@@ -125,31 +123,31 @@ def server(server_id=None):
                             client_num = client_num.strip()
                             message = message.strip()
                             
-                            print(f"Сервер {server_id}: Получено сообщение от клиента №{client_num}: {message}")
+                            print(f"Сообщение от клиента №{client_num}: {message}")
                             
                             # Очищаем файл
                             time.sleep(1)
                             os.ftruncate(fd, 0)
 
                             if message.lower() == "ping":
-                                response = f"Клиент №{client_num}: pong от сервера {server_id}"
+                                response = f"pong от сервера {server_id}"
                                 # Записываем ответ в файл
                                 os.lseek(fd, 0, os.SEEK_SET)
                                 os.write(fd, response.encode('utf-8'))
-                                print(f"Сервер {server_id}: Отправлен ответ клиенту №{client_num}")
+                                print(f"Отправлен ответ клиенту №{client_num}")
                                 
                                 # Сбрасываем буферы на диск
                                 os.fsync(fd)                            
                             else:
                                 # Выводим ошибку в терминал
-                                error_msg = f"Сервер {server_id}: Клиент №{client_num}: Ошибка: неверный запрос"
+                                error_msg = f"Клиент №{client_num}: Ошибка: неверный запрос"
                                 print(error_msg)
                                 os.lseek(fd, 0, os.SEEK_SET)
                                 os.write(fd, b" ")
                                 os.fsync(fd)
                         else:
                             # Если формат неверный
-                            print(f"Сервер {server_id}: Получено некорректное сообщение: {message_data}")
+                            print(f"Получено некорректное сообщение: {message_data}")
                             os.lseek(fd, 0, os.SEEK_SET)
                             os.write(fd, b" ")
                             os.fsync(fd)
