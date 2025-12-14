@@ -57,7 +57,7 @@ def server(server_id=None):
                 print(f"Ошибка при оповещении клиентов: {e}")
             
             # Даем время клиентам получить сообщение
-            time.sleep(0.5)
+            time.sleep(1)  # Увеличиваем задержку для гарантии доставки
             
             # Удаляем файлы
             if os.path.exists(shared_file):
