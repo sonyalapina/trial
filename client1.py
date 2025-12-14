@@ -70,6 +70,8 @@ def client(server_id):
                 if not os.path.exists(shared_file) or not os.path.exists(clients_file):
                     shutdown_event.set()
                     print(f"\nСервер отключен")
+                    # Завершаем программу
+                    os._exit(0)
                     return
                 
                 # Проверяем, не пришло ли сообщение о завершении сервера
@@ -82,10 +84,12 @@ def client(server_id):
                             data = os.read(fd, 1024)
                             
                             if data:
-                                response = data.decode('utf-8').strip()
-                                if response == "SERVER_SHUTDOWN":
+                                # НЕ используем strip() здесь!
+                                response = data.decode('utf-8')
+                                if response.strip() == "SERVER_SHUTDOWN":
                                     shutdown_event.set()
                                     print(f"\nСервер отключен")
+                                    os._exit(0)
                                     return
                             
                             os.lockf(fd, os.F_ULOCK, 0)
@@ -108,11 +112,6 @@ def client(server_id):
     try:
         while not shutdown_event.is_set():
             try:
-                # Проверяем, не отключился ли сервер
-                if shutdown_event.is_set():
-                    print(f"\nСервер отключен")
-                    break
-                
                 # Используем обычный input для нормального ввода
                 user_input = input("Введите запрос: ").strip()
                 
@@ -128,7 +127,9 @@ def client(server_id):
             
             if shutdown_event.is_set():
                 print(f"\nСервер отключен")
-                break
+                # Завершаем программу
+                os._exit(0)
+                return 0
             
             if user_input.lower() == "exit":
                 print(f"Клиент №{client_number} завершает работу...")
@@ -163,6 +164,7 @@ def client(server_id):
                 # Проверяем, не завершился ли сервер перед отправкой
                 if shutdown_event.is_set():
                     print(f"\nСервер отключен")
+                    os._exit(0)
                     return 0
                 
                 # Открываем файл для записи с блокировкой
@@ -198,26 +200,29 @@ def client(server_id):
                         data = os.read(fd, 1024)
                         
                         if data:
-                            response = data.decode('utf-8').strip()
+                            # НЕ используем strip() при проверке ответа " "
+                            response = data.decode('utf-8')
+                            response_trimmed = response.strip()
                             
                             # Проверяем, не пришло ли сообщение о завершении сервера
-                            if response == "SERVER_SHUTDOWN":
+                            if response_trimmed == "SERVER_SHUTDOWN":
                                 shutdown_event.set()
                                 print(f"\nСервер отключен")
+                                os._exit(0)
                                 return 0
                             elif response == " ":
                                 # Это специальный ответ от сервера на неверный запрос
                                 print(f"Ошибка: неверный запрос (сервер не распознал команду)")
                                 response_received = True
-                            else:
+                            elif response_trimmed:
                                 # Проверяем, что ответ отличается от нашего запроса
                                 # и содержит ответ от сервера
-                                if "pong" in response.lower() or "сервер" in response.lower():
-                                    print(f"{response}")
+                                if "pong" in response_trimmed.lower() or "сервер" in response_trimmed.lower():
+                                    print(f"{response_trimmed}")
                                     response_received = True
-                                elif not response.startswith(f"{client_number}:"):
+                                elif not response_trimmed.startswith(f"{client_number}:"):
                                     # Любой другой ответ, который не начинается с нашего номера
-                                    print(f"{response}")
+                                    print(f"{response_trimmed}")
                                     response_received = True
                             
                             # Очищаем файл только если получили ответ
@@ -232,6 +237,7 @@ def client(server_id):
                         if isinstance(e, FileNotFoundError):
                             shutdown_event.set()
                             print(f"\nСервер отключен")
+                            os._exit(0)
                             return 0
                         
                         try:
@@ -246,6 +252,8 @@ def client(server_id):
                         time.sleep(0.1)
                 
                 if shutdown_event.is_set():
+                    print(f"\nСервер отключен")
+                    os._exit(0)
                     return 0
                 
                 if not response_received:
@@ -256,6 +264,7 @@ def client(server_id):
             except FileNotFoundError:
                 shutdown_event.set()
                 print(f"\nСервер отключен")
+                os._exit(0)
                 return 0
             except OSError as e:
                 if e.errno == errno.EACCES:
@@ -263,6 +272,7 @@ def client(server_id):
                 else:
                     shutdown_event.set()
                     print(f"\nСервер отключен")
+                    os._exit(0)
                 return 0
             except Exception as e:
                 print(f"Неожиданная ошибка: {e}")
@@ -290,6 +300,8 @@ def client(server_id):
             os.close(fd)
         except:
             pass
+        
+        os._exit(0)
     
     # Даем время мониторинговому потоку завершиться
     shutdown_event.set()
