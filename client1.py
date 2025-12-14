@@ -1,144 +1,242 @@
+#!/usr/bin/env python3
 import os
-import sys
 import time
+import sys
 import errno
 
-shared_file = "shared_memory.txt"
-clients_file = "clients_count.txt"
-
-
 def client(server_id):
-    # Регистрируем клиента
+    # Используем тот же файл, что и сервер
+    shared_file = f"/tmp/shared_communication_{server_id}.txt"
+    
+    if not os.path.exists(shared_file):
+        print(f"Сервер с ID '{server_id}' не запущен или файл не найден")
+        print("Запустите сервер с командой: python server.py [server_id]")
+        return 1
+    
+    # Файл для хранения информации о клиентах
+    clients_file = f"/tmp/clients_info_{server_id}.txt"
+    client_number = None
+    
+    # Получаем номер клиента
     try:
-        fd = os.open(clients_file, os.O_RDWR)
+        fd = os.open(clients_file, os.O_RDWR | os.O_CREAT)
         os.lockf(fd, os.F_LOCK, 0)
-
-        data = os.read(fd, 1024)
-        current_clients = int(data.decode("utf-8") or "0")
+        
+        # Читаем текущее количество клиентов
+        try:
+            data = os.read(fd, 1024)
+            if data:
+                current_clients = int(data.decode('utf-8').strip())
+            else:
+                current_clients = 0
+        except:
+            current_clients = 0
+        
+        # Увеличиваем счетчик и получаем номер клиента
         client_number = current_clients + 1
-
+        
+        # Записываем обновленное количество
         os.lseek(fd, 0, os.SEEK_SET)
-        os.write(fd, str(client_number).encode("utf-8"))
+        os.write(fd, str(client_number).encode('utf-8'))
         os.ftruncate(fd, len(str(client_number)))
-
+        os.fsync(fd)
+        
         os.lockf(fd, os.F_ULOCK, 0)
         os.close(fd)
-
+        
+        print(f"\nПодключение к серверу {server_id}")
+        print(f"Вы - клиент №{client_number}")
+        print("Введите запрос или 'exit' для выхода\n")
+        
     except Exception as e:
-        print("Ошибка при регистрации клиента:", e)
+        print(f"Ошибка при получении номера клиента: {e}")
         return 1
-
-    print(f"Клиент №{client_number} подключён к серверу [{server_id}]\n")
-
-    try:
+    
+    # Функция для проверки состояния сервера
+    def check_server_alive():
+        return os.path.exists(shared_file) and os.path.exists(clients_file)
+    
+    try:    
         while True:
-            user_input = input(f"Клиент №{client_number} → Введите сообщение: ")
-
+            # Проверяем, жив ли сервер
+            if not check_server_alive():
+                print(f"\nСервер отключен")
+                return 0
+            
             try:
-                # Пишем запрос
-                fd = os.open(shared_file, os.O_RDWR)
-                os.lockf(fd, os.F_LOCK, 0)
+                user_input = input(f"Клиент №{client_number}> ").strip()
+            except EOFError:
+                # Если ввод завершен (может произойти при закрытии терминала)
+                print()
+                break
+            
+            if user_input.lower() == "exit":
+                print(f"Клиент №{client_number} завершает работу...")
+                
+                # Уменьшаем счетчик клиентов при выходе
+                try:
+                    fd = os.open(clients_file, os.O_RDWR)
+                    os.lockf(fd, os.F_LOCK, 0)
+                    
+                    data = os.read(fd, 1024)
+                    if data:
+                        current_clients = int(data.decode('utf-8').strip())
+                        # Не уменьшаем ниже 0
+                        if current_clients > 0:
+                            new_count = current_clients - 1
+                            os.lseek(fd, 0, os.SEEK_SET)
+                            os.write(fd, str(new_count).encode('utf-8'))
+                            os.ftruncate(fd, len(str(new_count)))
+                    
+                    os.lockf(fd, os.F_ULOCK, 0)
+                    os.close(fd)
+                except:
+                    pass
+                    
+                break
 
+            if not user_input:                
+                print(f"Клиент №{client_number}: Ошибка: запрос не может быть пустым\n")
+                continue
+            
+            try:            
+                # Проверяем, жив ли сервер перед отправкой
+                if not check_server_alive():
+                    print(f"\nСервер отключен")
+                    return 0
+                
+                # Открываем файл для записи с блокировкой
+                fd = os.open(shared_file, os.O_RDWR)            
+                os.lockf(fd, os.F_LOCK, 0)
+                
+                # Записываем запрос в файл с номером клиента
                 request_data = f"{client_number}:{user_input}"
                 os.lseek(fd, 0, os.SEEK_SET)
-                os.write(fd, request_data.encode("utf-8"))
+                os.write(fd, request_data.encode('utf-8'))
+                
+                # Сбрасываем на диск
                 os.fsync(fd)
-
+                
+                # Снимаем блокировку
                 os.lockf(fd, os.F_ULOCK, 0)
                 os.close(fd)
-
+                
                 response_received = False
                 timeout = 5
                 start_time = time.time()
-
-                while not response_received and (time.time() - start_time) < timeout:
+                server_shutdown_detected = False
+                
+                while not response_received and not server_shutdown_detected and (time.time() - start_time) < timeout:
+                    # Проверяем, жив ли сервер
+                    if not check_server_alive():
+                        print(f"\nСервер отключен")
+                        server_shutdown_detected = True
+                        break
+                    
                     try:
+                        # Открываем для чтения
                         fd = os.open(shared_file, os.O_RDWR)
+                        
+                        # Блокируем для чтения
                         os.lockf(fd, os.F_LOCK, 0)
-
+                        
+                        # Читаем ответ
                         os.lseek(fd, 0, os.SEEK_SET)
                         data = os.read(fd, 1024)
-
+                        
                         if data:
-                            response = data.decode("utf-8").strip()
-
-                            # --- Ловим отключение сервера ---
-                            if response == "__SERVER_DOWN__":
-                                print(f"Клиент №{client_number}: сервер отключился")
-                                os.ftruncate(fd, 0)
-                                os.lockf(fd, os.F_ULOCK, 0)
-                                os.close(fd)
-                                return 0
-                            # --- конец добавки ---
-
-                            if response == " ":
+                            response = data.decode('utf-8').strip()
+                            
+                            # Проверяем, не пришло ли сообщение о завершении сервера
+                            if response == "SERVER_SHUTDOWN":
+                                print(f"\nСервер отключен")
+                                server_shutdown_detected = True
+                                response_received = True
+                            elif response == " ":
                                 print(f"Клиент №{client_number}: Ошибка: неверный запрос")
                                 response_received = True
                             else:
-                                # Ответ должен быть от сервера (не наш запрос)
+                                # Проверяем, что ответ отличается от нашего запроса
                                 if not response.startswith(f"{client_number}:"):
                                     print(f"Клиент №{client_number}: {response}")
                                     response_received = True
-
-                            if response_received:
+                            
+                            # Очищаем файл
+                            if response_received and not server_shutdown_detected:
                                 os.ftruncate(fd, 0)
 
                         os.lockf(fd, os.F_ULOCK, 0)
-                        os.close(fd)
-
-                    except Exception:
+                        os.close(fd)                        
+                   
+                    except Exception as e:
+                        # Если файл не найден, значит сервер завершил работу
+                        if isinstance(e, FileNotFoundError):
+                            print(f"\nСервер отключен")
+                            server_shutdown_detected = True
+                            break
+                        
                         try:
-                            if "fd" in locals():
+                            if 'fd' in locals():
                                 os.lockf(fd, os.F_ULOCK, 0)
                                 os.close(fd)
                         except:
                             pass
-
-                    if not response_received:
+                        continue
+                    
+                    if not response_received and not server_shutdown_detected:
                         time.sleep(0.1)
-
+                
+                if server_shutdown_detected:
+                    # Завершаем клиента
+                    return 0
+                
                 if not response_received:
                     print(f"Клиент №{client_number}: Таймаут: сервер не ответил")
-
+                
                 print()
-
+           
+            except FileNotFoundError:
+                print(f"\nСервер отключен")
+                return 0
             except OSError as e:
                 if e.errno == errno.EACCES:
                     print(f"Клиент №{client_number}: Ошибка доступа к файлу")
-                break
-
+                else:
+                    print(f"\nСервер отключен")
+                return 0
             except Exception as e:
                 print(f"Клиент №{client_number}: Неожиданная ошибка: {e}")
                 break
-
+    
     except KeyboardInterrupt:
         print(f"\nКлиент №{client_number} завершает работу...")
-
-        # Уменьшаем счётчик клиентов
+        
+        # Уменьшаем счетчик клиентов при прерывании
         try:
             fd = os.open(clients_file, os.O_RDWR)
             os.lockf(fd, os.F_LOCK, 0)
-
-            data = os.read(fd, 1024).decode("utf-8") or "0"
-            current_clients = int(data)
-
-            new_count = max(0, current_clients - 1)
-            os.lseek(fd, 0, os.SEEK_SET)
-            os.write(fd, str(new_count).encode("utf-8"))
-            os.ftruncate(fd, len(str(new_count)))
-
+            
+            data = os.read(fd, 1024)
+            if data:
+                current_clients = int(data.decode('utf-8').strip())
+                if current_clients > 0:
+                    new_count = current_clients - 1
+                    os.lseek(fd, 0, os.SEEK_SET)
+                    os.write(fd, str(new_count).encode('utf-8'))
+                    os.ftruncate(fd, len(str(new_count)))
+            
             os.lockf(fd, os.F_ULOCK, 0)
             os.close(fd)
         except:
             pass
-
+    
     return 0
-
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
         print("Использование: python client.py <server_id>")
+        print("Пример: python client.py server1")
         sys.exit(1)
-
+    
     server_id = sys.argv[1]
     sys.exit(client(server_id))
