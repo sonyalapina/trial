@@ -7,27 +7,26 @@ import threading
 import select
 
 def client(server_id):
-    # Используем тот же файл, что и сервер
+    #тот же файл, что и для сервера
     shared_file = f"/tmp/shared_communication_{server_id}.txt"
     
-    if not os.path.exists(shared_file):
-        print(f"Сервер с ID '{server_id}' не запущен или файл не найден")
-        print("Запустите сервер с командой: python server.py [server_id]")
+    if not os.path.exists(shared_file):        
+        print("Сначала запустите сервер с командой: python server.py [server_id]")
         return 1
     
-    # Файл для хранения информации о клиентах
+    #тут храненится информации о клиентах
     clients_file = f"/tmp/clients_info_{server_id}.txt"
     client_number = None
     
-    # Флаг для завершения работы
+    #флаг для завершения работы
     shutdown_event = threading.Event()
     
-    # Получаем номер клиента
+    #получаем номер клиента
     try:
         fd = os.open(clients_file, os.O_RDWR | os.O_CREAT)
         os.lockf(fd, os.F_LOCK, 0)
         
-        # Читаем текущее количество клиентов
+        #читаем текущее кол-во клиентов
         try:
             data = os.read(fd, 1024)
             if data:
@@ -37,10 +36,10 @@ def client(server_id):
         except:
             current_clients = 0
         
-        # Увеличиваем счетчик и получаем номер клиента
+        #получаем номер клиента
         client_number = current_clients + 1
         
-        # Записываем обновленное количество
+        #записываем обновленное количество
         os.lseek(fd, 0, os.SEEK_SET)
         os.write(fd, str(client_number).encode('utf-8'))
         os.ftruncate(fd, len(str(client_number)))
@@ -57,24 +56,24 @@ def client(server_id):
         print(f"Ошибка при получении номера клиента: {e}")
         return 1
     
-    # Функция для фонового мониторинга сервера
+    #фоновый мониторинг сервера
     def monitor_server():
         last_check = 0
-        check_interval = 0.5  # Проверка каждые 0.5 секунды
+        check_interval = 0.5  #проверка каждые полсекунды
         
         while not shutdown_event.is_set():
             current_time = time.time()
             if current_time - last_check >= check_interval:
                 last_check = current_time
                 
-                # Проверяем наличие файлов сервера
+                #проверяем есть ли файлы сервера
                 if not os.path.exists(shared_file) or not os.path.exists(clients_file):
                     shutdown_event.set()
                     print(f"\nСервер отключен")
                     os._exit(0)
                     return
                 
-                # Проверяем, не пришло ли сообщение о завершении сервера
+                #проверяем, не пришло ли сообщение о завершении сервера
                 try:
                     if os.path.exists(shared_file):
                         fd = os.open(shared_file, os.O_RDWR)
@@ -112,21 +111,19 @@ def client(server_id):
     try:    
         while not shutdown_event.is_set():
             try:
-                # Используем select для неблокирующего ввода
-                if sys.platform == "win32":
-                    # На Windows
-                    import msvcrt
-                    if msvcrt.kbhit():
-                        user_input = input(f"Клиент №{client_number}> ").strip()
-                    else:
-                        time.sleep(0.1)
-                        continue
-                else:
-                    # На Unix-системах
-                    ready, _, _ = select.select([sys.stdin], [], [], 0.1)
-                    if not ready:
-                        continue
-                    user_input = sys.stdin.readline().strip()
+            # Выводим приглашение
+            sys.stdout.write("Введите запрос: ")
+            sys.stdout.flush()
+            
+            # Ждем ввод
+            ready, _, _ = select.select([sys.stdin], [], [], 0.1)
+            if not ready:
+                # Если ввода нет, очищаем и начинаем заново
+                sys.stdout.write('\r' + ' ' * 20 + '\r')
+                sys.stdout.flush()
+                continue
+            
+            user_input = sys.stdin.readline().strip()
                 
             except EOFError:
                 # Если ввод завершен (может произойти при закрытии терминала)
@@ -140,7 +137,7 @@ def client(server_id):
                 break
             
             if user_input.lower() == "exit":
-                print(f"Клиент №{client_number} завершает работу...")
+                print("Клиент завершает работу...")
                 
                 # Уменьшаем счетчик клиентов при выходе
                 try:
@@ -165,7 +162,7 @@ def client(server_id):
                 break
 
             if not user_input:                
-                print(f"Клиент №{client_number}: Ошибка: запрос не может быть пустым\n")
+                print("Ошибка: запрос не может быть пустым\n")
                 continue
             
             # Проверяем, не завершился ли сервер перед отправкой
@@ -216,12 +213,12 @@ def client(server_id):
                                 os._exit(0)
                                 return
                             elif response == " ":
-                                print(f"Клиент №{client_number}: Ошибка: неверный запрос")
+                                print("Ошибка: неверный запрос")
                                 response_received = True
                             else:
                                 # Проверяем, что ответ отличается от нашего запроса
                                 if not response.startswith(f"{client_number}:"):
-                                    print(f"Клиент №{client_number}: {response}")
+                                    print(f"{response}")
                                     response_received = True
                             
                             # Очищаем файл
@@ -254,7 +251,7 @@ def client(server_id):
                     return 0
                 
                 if not response_received:
-                    print(f"Клиент №{client_number}: Таймаут: сервер не ответил")
+                    print("Таймаут: сервер не ответил")
                 
                 print()
            
@@ -265,14 +262,14 @@ def client(server_id):
                 return 0
             except OSError as e:
                 if e.errno == errno.EACCES:
-                    print(f"Клиент №{client_number}: Ошибка доступа к файлу")
+                    print("Ошибка доступа к файлу")
                 else:
                     shutdown_event.set()
                     print(f"\nСервер отключен")
                     os._exit(0)
                 return 0
             except Exception as e:
-                print(f"Клиент №{client_number}: Неожиданная ошибка: {e}")
+                print("Неожиданная ошибка: {e}")
                 break
     
     except KeyboardInterrupt:
@@ -306,8 +303,7 @@ def client(server_id):
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print("Использование: python client.py <server_id>")
-        print("Пример: python client.py server1")
+        print("Использование: python client.py <server_id>")        
         sys.exit(1)
     
     server_id = sys.argv[1]
